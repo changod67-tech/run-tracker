@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Run Tracker</title>
   <meta name="description" content="Your running plan, one day at a time.">
-  <meta name="theme-color" content="#F4F2EE" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0E0F11" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F3F4F8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0C10" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -16,20 +16,24 @@
   <link rel="icon" href="icon-180.png">
   <style>
     :root {
-      --bg: #F4F2EE;
+      --bg: #F3F4F8;
       --surface: #FFFFFF;
-      --surface-2: #ECE9E3;
-      --ink: #16181C;
-      --muted: #676B72;
-      --line: #E2DED7;
-      --accent: #C9461A;
+      --surface-2: #E9EBF2;
+      --ink: #12141A;
+      --muted: #5F6470;
+      --line: #DDE0E8;
+      --accent: #2563EB;        /* blue: actions, today, links */
+      --accent-bg: #2563EB;
       --accent-ink: #FFFFFF;
-      --accent-soft: #F7E3D9;
+      --accent-soft: #E3ECFF;
+      --purple: #7C3AED;        /* purple: phases, the bigger picture */
+      --purple-soft: #EEE6FF;
+      --grad: linear-gradient(90deg, #2563EB, #7C3AED);
       --done: #1C7A4B;
       --done-soft: #DCEFE3;
-      --skip: #6E6A62;
+      --skip: #6A6E78;
       --danger: #B42318;
-      --tabbar: rgba(244, 242, 238, 0.86);
+      --tabbar: rgba(243, 244, 248, 0.86);
 
       --r-sm: 8px;
       --r-md: 12px;
@@ -41,20 +45,24 @@
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0E0F11;
-        --surface: #17191C;
-        --surface-2: #202327;
-        --ink: #F2F1EE;
-        --muted: #9B9EA4;
-        --line: #2A2D32;
-        --accent: #FF6B35;
-        --accent-ink: #160B05;
-        --accent-soft: #3A1E12;
+        --bg: #0B0C10;
+        --surface: #15171D;
+        --surface-2: #1E2129;
+        --ink: #F1F2F6;
+        --muted: #979BA6;
+        --line: #272A33;
+        --accent: #6EA4FF;
+        --accent-bg: #2F6FEB;
+        --accent-ink: #FFFFFF;
+        --accent-soft: #15233F;
+        --purple: #B794FF;
+        --purple-soft: #261B40;
+        --grad: linear-gradient(90deg, #3B82F6, #A26BFF);
         --done: #45C482;
         --done-soft: #15301F;
-        --skip: #A29D94;
+        --skip: #9DA1AB;
         --danger: #FF6B5E;
-        --tabbar: rgba(14, 15, 17, 0.84);
+        --tabbar: rgba(11, 12, 16, 0.84);
       }
     }
 
@@ -84,7 +92,7 @@
     /* ---- type ---- */
     .top { margin-bottom: var(--s5); }
     .eyebrow { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-    .eyebrow.accent { color: var(--accent); }
+    .eyebrow.accent { color: var(--purple); }
     .title { margin: var(--s1) 0 0; font: 700 34px/1.1 var(--font-display); letter-spacing: -0.02em; }
     .sub { margin: var(--s1) 0 0; color: var(--muted); }
     .help { margin: 0; font-size: 14px; color: var(--muted); }
@@ -102,7 +110,7 @@
     }
     .btn:active { transform: scale(0.98); }
     .btn svg { font-size: 20px; }
-    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .btn.primary { background: var(--accent-bg); border-color: var(--accent-bg); color: var(--accent-ink); }
     .btn.ghost { background: transparent; }
     .btn.danger { background: transparent; color: var(--danger); border-color: var(--line); }
     .btn.block { display: flex; width: 100%; }
@@ -119,6 +127,8 @@
       padding: var(--s5);
       margin-bottom: var(--s6);
     }
+    .card.workout { position: relative; overflow: hidden; }
+    .card.workout::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--grad); }
     .workout-title { margin: var(--s2) 0 0; font: 700 26px/1.15 var(--font-display); letter-spacing: -0.015em; }
     .distance { margin: var(--s3) 0 0; display: flex; align-items: baseline; gap: var(--s2); }
     .distance .num { font: 700 64px/0.95 var(--font-display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
@@ -171,7 +181,7 @@
     .range { font-weight: 500; color: var(--muted); font-size: 15px; margin-left: var(--s1); }
     .pill {
       display: inline-block; padding: 2px var(--s2); border-radius: 999px;
-      background: var(--accent-soft); color: var(--accent);
+      background: var(--purple-soft); color: var(--purple);
       font-size: 12px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap;
     }
     .goal { margin: var(--s1) 0 0; color: var(--muted); font-size: 15px; }
@@ -199,7 +209,13 @@
     .progress p { margin: var(--s2) 0 0; font-size: 14px; color: var(--muted); }
     .progress strong { color: var(--ink); }
     .bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-    .bar span { display: block; height: 100%; width: var(--p); background: var(--done); border-radius: inherit; transition: width 0.3s ease; }
+    .bar span { display: block; height: 100%; width: var(--p); background: var(--grad); border-radius: inherit; transition: width 0.3s ease; }
+
+    /* ---- coming up ---- */
+    .upnext { margin-top: var(--s8); }
+    .section-title { margin: 0 0 var(--s3); font: 700 20px/1.2 var(--font-display); }
+    .rows .when { font-size: 13px; font-weight: 600; color: var(--purple); white-space: nowrap; }
+    .row.up { grid-template-columns: 44px 1fr auto; }
 
     /* ---- plan list ---- */
     .plan-week { margin-bottom: var(--s6); scroll-margin-top: calc(env(safe-area-inset-top) + var(--s4)); }

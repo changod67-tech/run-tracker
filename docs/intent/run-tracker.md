@@ -22,6 +22,19 @@ Confirmed with the user on 2026-10-29.
   - Generating training plans.
   - Push notifications and syncing across devices.
 
+## v2 (confirmed 2026-10-29)
+
+- **Coming up:** the next 3 runs fill the empty space under the week strip. Tapping one opens it.
+- **Reminders:**
+  - A morning push on run days only, naming the workout, at a time you pick in Plans (default 7:00 AM).
+  - Sent by a free Cloudflare Worker.
+  - Edits, moved runs and plan switches resync automatically.
+- **Look:** orange removed. Blue for actions, purple for the big picture, a blue→purple blend on the progress bar and the icon, green kept for done. Dark and light mode.
+- **Constraints:**
+  - Notifications only work from the home-screen app (iOS 16.4+).
+  - The Worker stores only run dates, titles and distances, never Strava keys.
+- **Out of scope:** race countdown, stats, evening-before reminders, rest-day reminders, new screens.
+
 ## Plan text format
 
 ```

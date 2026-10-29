@@ -1,0 +1,11 @@
+{
+  "name": "run-tracker-reminders",
+  "main": "index.js",
+  "compatibility_date": "2026-10-01",
+  "kv_namespaces": [{ "binding": "SUBS", "id": "408827e9691046d7861dcaa2582436e7" }],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "VAPID_PUBLIC_KEY": "BJyeQBnY8uJLwklBZrCLI_WnEAWRHNNW1YeN6xLK4-Abfx6eeeNxv4zAz-zWf-baJXwIGn8h9JP1_XGtIcBLWl4"
+  }
+  // VAPID_PRIVATE_JWK is a secret: wrangler secret put VAPID_PRIVATE_JWK
+}

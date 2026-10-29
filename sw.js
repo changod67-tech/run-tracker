@@ -1,7 +1,7 @@
 // Offline support: serve the app from cache, refresh the cache in the background.
 // Bump CACHE when shipping so old files get cleared.
-const CACHE = 'run-tracker-v1';
-const FILES = ['./', 'index.html', 'app.js', 'plan.js', 'strava.js', 'seed.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
+const CACHE = 'run-tracker-v2';
+const FILES = ['./', 'index.html', 'app.js', 'plan.js', 'strava.js', 'reminders.js', 'seed.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -24,4 +24,15 @@ self.addEventListener('fetch', e => {
     if (hit) { fresh.catch(() => {}); return hit; }
     return fresh;
   }));
+});
+
+self.addEventListener('push', e => {
+  const msg = e.data?.json() ?? { title: 'Run Tracker', body: 'Time to check today’s run.' };
+  e.waitUntil(self.registration.showNotification(msg.title, { body: msg.body, icon: 'icon-180.png', tag: 'run-reminder' }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window' }).then(wins =>
+    wins.length ? wins[0].focus() : self.clients.openWindow('./#today')));
 });

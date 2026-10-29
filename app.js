@@ -1,6 +1,7 @@
 import { parsePlan, iso, fromIso, addDays, uid } from './plan.js';
 import { SEED_NAME, SEED_PLAN } from './seed.js';
 import * as strava from './strava.js';
+import * as reminders from './reminders.js';
 
 const KEY = 'run-tracker';
 const $ = s => document.querySelector(s);
@@ -41,6 +42,17 @@ function save() {
   } catch {
     toast('Couldn’t save on this phone. Save a backup from Plans.');
   }
+  if (state.reminders?.on) {
+    clearTimeout(save.t);
+    save.t = setTimeout(syncReminders, 1500);
+  }
+}
+
+// Any change (status, edit, move, plan switch) re-sends the upcoming runs.
+function syncReminders() {
+  const p = plan();
+  const upcoming = p ? runs(p).filter(d => d.date >= today() && !d.status) : [];
+  return reminders.sync(upcoming, state.reminders.time).catch(() => {});
 }
 
 const plan = () => state.plans.find(p => p.id === state.activeId) ?? state.plans[0];
@@ -90,14 +102,27 @@ function viewToday() {
   const wk = weekOf(p, sel) ?? (sel < p.weeks[0].start ? p.weeks[0] : p.weeks.at(-1));
   const title = sel === t ? 'Today' : fmt(sel, { weekday: 'long' });
 
+  const upcoming = all.filter(d => d.date > sel);
   let card;
   if (run) card = workoutCard(run, wk);
-  else if (!first || sel < first) card = infoCard('Plan starts soon', countdown(sel, p.weeks[0].start), all[0]);
+  else if (!first || sel < first) card = infoCard('Plan starts soon', countdown(sel, p.weeks[0].start), upcoming.shift());
   else if (sel > last) card = completeCard(all);
-  else card = infoCard('Rest day', 'Recovery is part of the plan.', all.find(d => d.date > sel));
+  else card = infoCard('Rest day', 'Recovery is part of the plan.', upcoming.shift());
 
   return header(fmt(sel, { weekday: 'long', month: 'long', day: 'numeric' }), title)
-    + card + weekStrip(p, wk, sel, t);
+    + card + weekStrip(p, wk, sel, t) + comingUp(upcoming.slice(0, 3), sel);
+}
+
+function comingUp(list, from) {
+  if (!list.length) return '';
+  const when = date => {
+    const n = Math.round((fromIso(date) - fromIso(from)) / 864e5);
+    return n === 1 ? 'Tomorrow' : n < 7 ? fmt(date, { weekday: 'long' }) : `In ${n} days`;
+  };
+  return `<section class="upnext" aria-labelledby="up">
+    <h2 class="section-title" id="up">Coming up</h2>
+    <ul class="rows">${list.map(d => planRow(d, today(), 'select', `<span class="when">${when(d.date)}</span>`)).join('')}</ul>
+  </section>`;
 }
 
 function countdown(from, start) {
@@ -211,14 +236,14 @@ function viewPlan() {
     }).join('');
 }
 
-function planRow(d, t) {
-  return `<li><button class="row ${d.status || ''}${d.date === t ? ' is-today' : ''}" data-act="edit-run" data-id="${d.id}">
+function planRow(d, t, act = 'edit-run', trailing) {
+  return `<li><button class="row ${d.status || ''}${d.date === t ? ' is-today' : ''}${trailing ? ' up' : ''}" data-act="${act}" data-id="${d.id}" data-date="${d.date}">
     <span class="date"><span class="dow">${fmt(d.date, { weekday: 'short' })}</span><span class="dnum">${fromIso(d.date).getDate()}</span></span>
     <span class="row-body">
       <span class="row-title">${esc(d.title)}</span>
       <span class="row-dist">${esc(d.distance)}${d.miles ? ` · ${d.miles} mi logged` : ''}</span>
     </span>
-    <span class="row-status">${d.status ? `${statusMark(d)}<span class="sr">${STATUS[d.status]}</span>` : ''}</span>
+    ${trailing ?? `<span class="row-status">${d.status ? `${statusMark(d)}<span class="sr">${STATUS[d.status]}</span>` : ''}</span>`}
   </button></li>`;
 }
 
@@ -238,6 +263,11 @@ function viewPlans() {
         </button></li>`;
       }).join('')}</ul>
       <button class="btn primary block" data-act="import">Import a plan</button>
+    </section>
+
+    <section class="group" aria-labelledby="g-rem">
+      <h2 class="group-title" id="g-rem">Reminders</h2>
+      ${remindersPanel()}
     </section>
 
     <section class="group" aria-labelledby="g-strava">
@@ -277,6 +307,40 @@ function viewPlans() {
     ${standalone ? '' : `<section class="group"><div class="panel hint">
       <p><strong>Install on your iPhone:</strong> open this page in Safari, tap Share, then <em>Add to Home Screen</em>.</p>
     </div></section>`}`;
+}
+
+function remindersPanel() {
+  const r = state.reminders ?? {};
+  const time = r.time ?? '07:00';
+  const pretty = new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (!reminders.supported()) {
+    return `<div class="panel"><p class="help">Add Runs to your Home Screen and open it from there to turn on reminders.</p></div>`;
+  }
+  return `<div class="panel">
+    ${r.on
+      ? `<p><strong>On.</strong> A notification at ${pretty} on run days, saying what to run.</p>`
+      : '<p class="help">Get a morning notification on run days that says what to run. Rest days stay quiet.</p>'}
+    <label class="field"><span>Time</span><input type="time" id="rem-time" value="${time}" required></label>
+    ${r.on
+      ? `<div class="btn-row">
+          <button class="btn" data-act="rem-test">Send a test</button>
+          <button class="btn ghost" data-act="rem-off">Turn off</button>
+        </div>`
+      : '<button class="btn primary block" data-act="rem-on">Turn on reminders</button>'}
+  </div>`;
+}
+
+async function remindersOn() {
+  try {
+    await reminders.enable();
+    state.reminders = { on: true, time: $('#rem-time')?.value || '07:00' };
+    save();
+    await syncReminders();
+    render();
+    toast('Reminders on');
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 // ---------- sheets (edit dialogs) ----------
@@ -462,7 +526,7 @@ async function restoreBackup(file) {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.plans)) throw new Error();
     if (!confirm(`Replace your plans with the ${data.plans.length} in this backup?`)) return;
-    state = { ...data, strava: state.strava };
+    state = { ...data, strava: state.strava, reminders: state.reminders };
     save();
     render();
     toast('Backup restored');
@@ -502,7 +566,7 @@ main.addEventListener('click', e => {
     render();
     main.querySelector('.workout .btn, .workout .result .link')?.focus();
   }
-  if (act === 'select') { selected = date === today() ? null : date; render(); }
+  if (act === 'select') { selected = date === today() ? null : date; render(); scrollTo({ top: 0, behavior: 'smooth' }); }
   if (act === 'edit-run') editRun(id);
   if (act === 'add-run') editRun(null, id);
   if (act === 'edit-week') editWeek(id);
@@ -510,12 +574,22 @@ main.addEventListener('click', e => {
   if (act === 'import') importPlan();
   if (act === 'sync') syncStrava(true);
   if (act === 'disconnect' && confirm('Disconnect Strava?')) { state.strava = {}; save(); render(); }
+  if (act === 'rem-on') remindersOn();
+  if (act === 'rem-test') reminders.test().then(() => toast('Test sent. It should arrive in a few seconds.'), err => toast(err.message));
+  if (act === 'rem-off') {
+    reminders.disable().finally(() => { state.reminders = { ...state.reminders, on: false }; save(); render(); toast('Reminders off'); });
+  }
   if (act === 'export') exportBackup();
   if (act === 'restore') $('#restore-file').click();
 });
 
 main.addEventListener('change', e => {
   if (e.target.id === 'restore-file' && e.target.files[0]) restoreBackup(e.target.files[0]);
+  if (e.target.id === 'rem-time' && e.target.value) {
+    state.reminders = { ...state.reminders, time: e.target.value };
+    save();
+    render();
+  }
 });
 
 main.addEventListener('submit', e => {
@@ -544,3 +618,4 @@ render();
 finishStravaLogin().then(() => syncStrava(false));
 navigator.storage?.persist?.();
 if ('serviceWorker' in navigator && location.hostname !== 'localhost') navigator.serviceWorker.register('sw.js');
+if (state.reminders?.on) syncReminders(); // keeps the server's copy fresh as days pass
