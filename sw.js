@@ -1,10 +1,11 @@
-// Offline support: serve the app from cache, refresh the cache in the background.
-// Bump CACHE when shipping so old files get cleared.
-const CACHE = 'run-tracker-v3';
+// Offline support: always try the network first (so a new release shows up on the next open),
+// fall back to the cached copy when offline. Bump CACHE when shipping so old files get cleared.
+const CACHE = 'run-tracker-v4';
 const FILES = ['./', 'index.html', 'app.js', 'plan.js', 'strava.js', 'reminders.js', 'seed.js', 'manifest.webmanifest', 'icon-v2-180.png', 'icon-v2-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
+  // cache: 'reload' skips the browser's HTTP cache so a new release never caches last release's files.
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))));
   self.skipWaiting();
 });
 
@@ -19,10 +20,13 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(caches.open(CACHE).then(async cache => {
     const key = url.pathname; // ignore ?code= and ?today= so the app shell always matches
-    const hit = await cache.match(key);
-    const fresh = fetch(e.request).then(r => { if (r.ok) cache.put(key, r.clone()); return r; });
-    if (hit) { fresh.catch(() => {}); return hit; }
-    return fresh;
+    try {
+      const r = await fetch(e.request.url, { cache: 'no-cache' }); // by URL: page navigations can't take options
+      if (r.ok) cache.put(key, r.clone());
+      return r;
+    } catch {
+      return (await cache.match(key)) ?? Response.error();
+    }
   }));
 });
 
